@@ -36,6 +36,30 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+### System-Wide Installation
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+cmake --build build
+sudo cmake --install build
+```
+
+### Arch Linux Installation (`PKGBUILD`)
+
+```bash
+makepkg -si
+```
+
+Once installed system-wide, any CMake project can consume `zpp` directly via `find_package`:
+
+```cmake
+find_package(zpp REQUIRED)
+
+zpp_add_executable(my_zig_app
+    ROOT src/main.zig
+)
+```
+
 ---
 
 ## CMake Usage (`cmake/ZigPreprocessor.cmake`)

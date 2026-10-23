@@ -12,6 +12,15 @@
 
 namespace {
 
+void require(bool cond, const char* expr, int line) {
+    if (!cond) {
+        throw std::runtime_error(std::string("Test assertion failed at line ") +
+                                 std::to_string(line) + ": " + expr);
+    }
+}
+
+#define ZPP_CHECK(cond) require((cond), #cond, __LINE__)
+
 void test_lexer_and_logical_lines() {
     std::string src =
         "#define MULTI_LINE(a, b) \\\n"
@@ -21,15 +30,15 @@ void test_lexer_and_logical_lines() {
         "const x = MULTI_LINE(1, 2);\n";
 
     auto lines = zpp::Lexer::split_logical_lines(src);
-    assert(lines.size() == 4);
-    assert(lines[0].is_directive);
-    assert(lines[0].directive_name == "define");
-    assert(lines[0].physical_line_count == 2);
+    ZPP_CHECK(lines.size() == 4);
+    ZPP_CHECK(lines[0].is_directive);
+    ZPP_CHECK(lines[0].directive_name == "define");
+    ZPP_CHECK(lines[0].physical_line_count == 2);
     // Zig multiline raw string ending in '\' must NOT be merged with next line
-    assert(!lines[1].is_directive);
-    assert(lines[1].physical_line_count == 1);
-    assert(!lines[2].is_directive);
-    assert(lines[2].physical_line_count == 1);
+    ZPP_CHECK(!lines[1].is_directive);
+    ZPP_CHECK(lines[1].physical_line_count == 1);
+    ZPP_CHECK(!lines[2].is_directive);
+    ZPP_CHECK(lines[2].physical_line_count == 1);
 
     zpp::Preprocessor pp;
     auto res = pp.process_string(src, "test.zig");
@@ -38,8 +47,8 @@ void test_lexer_and_logical_lines() {
     for (char c : res.output) {
         if (c == '\n') ++out_lines;
     }
-    assert(out_lines == 5);
-    assert(res.output.find("const x = ((1) + (2));") != std::string::npos);
+    ZPP_CHECK(out_lines == 5);
+    ZPP_CHECK(res.output.find("const x = ((1) + (2));") != std::string::npos);
 }
 
 void test_expr_evaluator() {
@@ -59,9 +68,9 @@ void test_expr_evaluator() {
         "#endif\n";
 
     auto res = pp.process_string(src, "expr.zig");
-    assert(res.output.find("const branch_a = true;") != std::string::npos);
-    assert(res.output.find("const branch_a = false;") == std::string::npos);
-    assert(res.output.find("const branch_b = true;") != std::string::npos);
+    ZPP_CHECK(res.output.find("const branch_a = true;") != std::string::npos);
+    ZPP_CHECK(res.output.find("const branch_a = false;") == std::string::npos);
+    ZPP_CHECK(res.output.find("const branch_b = true;") != std::string::npos);
 }
 
 void test_macros_stringify_paste_variadic() {
@@ -79,12 +88,12 @@ void test_macros_stringify_paste_variadic() {
 
     zpp::Preprocessor pp;
     auto res = pp.process_string(src, "macros.zig");
-    assert(res.output.find("const s = \"hello world\";") != std::string::npos);
-    assert(res.output.find("const my_var: i32 = 99;") != std::string::npos);
-    assert(res.output.find("const t1 = .{ 1  };") != std::string::npos);
-    assert(res.output.find("const t2 = .{ 1 , 2, 3 };") != std::string::npos);
-    assert(res.output.find("const g1 = .{ 10 };") != std::string::npos);
-    assert(res.output.find("const g2 = .{ 10, 20 };") != std::string::npos);
+    ZPP_CHECK(res.output.find("const s = \"hello world\";") != std::string::npos);
+    ZPP_CHECK(res.output.find("const my_var: i32 = 99;") != std::string::npos);
+    ZPP_CHECK(res.output.find("const t1 = .{ 1  };") != std::string::npos);
+    ZPP_CHECK(res.output.find("const t2 = .{ 1 , 2, 3 };") != std::string::npos);
+    ZPP_CHECK(res.output.find("const g1 = .{ 10 };") != std::string::npos);
+    ZPP_CHECK(res.output.find("const g2 = .{ 10, 20 };") != std::string::npos);
 }
 
 void test_multiline_macro_invocation_line_preservation() {
@@ -99,7 +108,7 @@ void test_multiline_macro_invocation_line_preservation() {
 
     zpp::Preprocessor pp;
     auto res = pp.process_string(src, "multiline.zig");
-    assert(res.output.find("const line_seven = 7;") != std::string::npos);
+    ZPP_CHECK(res.output.find("const line_seven = 7;") != std::string::npos);
 }
 
 void test_cimport_and_depfile() {
@@ -131,9 +140,9 @@ void test_cimport_and_depfile() {
     zpp::CImportProcessor proc(opts);
     auto res = proc.process(zig_src, (tmp_dir / "main.zig").string());
 
-    assert(res.transformed_source.find("@import(\"__zpp_cimports/cimport_") != std::string::npos);
-    assert(res.generated_zig_files.size() == 1);
-    assert(std::filesystem::exists(res.generated_zig_files[0]));
+    ZPP_CHECK(res.transformed_source.find("@import(\"__zpp_cimports/cimport_") != std::string::npos);
+    ZPP_CHECK(res.generated_zig_files.size() == 1);
+    ZPP_CHECK(std::filesystem::exists(res.generated_zig_files[0]));
 
     // Verify dependency discovery found sample.h
     bool found_sample_h = false;
@@ -143,7 +152,7 @@ void test_cimport_and_depfile() {
             break;
         }
     }
-    assert(found_sample_h);
+    ZPP_CHECK(found_sample_h);
 
     // Verify exact line count preservation across @cImport replacement
     std::size_t orig_newlines = 0;
@@ -154,7 +163,7 @@ void test_cimport_and_depfile() {
     for (char c : res.transformed_source) {
         if (c == '\n') ++new_newlines;
     }
-    assert(orig_newlines == new_newlines);
+    ZPP_CHECK(orig_newlines == new_newlines);
 
     std::filesystem::remove_all(tmp_dir);
 }

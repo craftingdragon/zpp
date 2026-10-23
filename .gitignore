@@ -1,4 +1,7 @@
 /build/
+/pkg/
+/src/build/
+/*.pkg.tar.*
 /cmake-build-*/
 /.zig-cache/
 /zig-cache/

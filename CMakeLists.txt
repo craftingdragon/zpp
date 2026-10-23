@@ -25,10 +25,41 @@ add_executable(zpp::zpp ALIAS zpp)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(ZigPreprocessor)
 
-# Install rules
+# Install rules & CMake package export (supports `find_package(zpp REQUIRED)` system-wide)
 include(GNUInstallDirs)
-install(TARGETS zpp RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(FILES cmake/ZigPreprocessor.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/zpp")
+include(CMakePackageConfigHelpers)
+
+set(ZPP_CMAKE_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/zpp")
+
+install(TARGETS zpp
+    EXPORT zppTargets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+
+install(EXPORT zppTargets
+    FILE zppTargets.cmake
+    NAMESPACE zpp::
+    DESTINATION "${ZPP_CMAKE_INSTALL_DIR}"
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/zppConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/zppConfig.cmake"
+    INSTALL_DESTINATION "${ZPP_CMAKE_INSTALL_DIR}"
+)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/zppConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZigPreprocessor.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/zppConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/zppConfigVersion.cmake"
+    DESTINATION "${ZPP_CMAKE_INSTALL_DIR}"
+)
 
 # Testing & demonstration targets
 option(ZPP_BUILD_TESTS "Build zpp unit and shadow-build integration tests" ON)

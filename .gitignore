@@ -1,0 +1,13 @@
+/build/
+/cmake-build-*/
+/.zig-cache/
+/zig-cache/
+/zig-out/
+/__zpp_cimports/
+*_zpp_autogen/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.d

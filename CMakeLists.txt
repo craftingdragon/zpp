@@ -102,4 +102,14 @@ if(ZPP_BUILD_TESTS)
     add_executable(c_calls_zig_test tests/zig_lib/caller.c)
     target_link_libraries(c_calls_zig_test PRIVATE zig_calc_lib)
     add_test(NAME c_calls_zig_test COMMAND c_calls_zig_test)
+
+    add_test(NAME zpp_zig_build_resources
+        COMMAND "${CMAKE_COMMAND}"
+            "-DFIXTURE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/zig_build"
+            "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/zig_build_resource_test"
+            "-DZPP_MODULE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZigPreprocessor.cmake"
+            "-DZPP_EXE=$<TARGET_FILE:zpp>"
+            "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zig_build/check_resources.cmake"
+    )
 endif()

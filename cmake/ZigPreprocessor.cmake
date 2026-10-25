@@ -6,7 +6,7 @@
 #   - zpp_target_sources(<target> ROOT <root.zig> [SOURCES <zig_files...>] [BASE_DIR <dir>] [ZIG_FLAGS <flags...>] [ZPP_FLAGS <flags...>])
 #   - zpp_add_executable(<target> ROOT <root.zig> [SOURCES <zig_files...>] [C_SOURCES <c_files...>] ...)
 #   - zpp_add_library(<target> [STATIC|SHARED|OBJECT] ROOT <root.zig> [SOURCES <zig_files...>] [C_SOURCES <c_files...>] ...)
-#   - zpp_add_zig_build(<target> [SOURCE_DIR <dir>] [BUILD_ZIG <build.zig>] SOURCES <zig_files...> ...)
+#   - zpp_add_zig_build(<target> [SOURCE_DIR <dir>] [BUILD_ZIG <build.zig>] SOURCES <zig_files...> [RESOURCES <files...>] ...)
 
 include_guard(GLOBAL)
 
@@ -340,18 +340,19 @@ function(zpp_add_library target)
     )
 endfunction()
 
-# Mirrors an entire Zig project (including build.zig) into a shadow build directory,
-# preprocesses all .zig files with zpp, and invokes `zig build` inside the shadow directory.
+# Mirrors listed Zig sources, the optional manifest, and listed resources into a
+# shadow build directory, then invokes `zig build` inside that directory.
 function(zpp_add_zig_build target)
     set(options NO_LIBC NO_CIMPORT)
     set(oneValueArgs SOURCE_DIR BUILD_ZIG TARGET_TRIPLE)
-    set(multiValueArgs SOURCES INCLUDE_DIRECTORIES COMPILE_DEFINITIONS ZIG_BUILD_ARGS ZPP_FLAGS)
+    set(multiValueArgs SOURCES RESOURCES INCLUDE_DIRECTORIES COMPILE_DEFINITIONS ZIG_BUILD_ARGS ZPP_FLAGS)
     cmake_parse_arguments(ZPP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if(NOT ZPP_SOURCE_DIR)
         set(ZPP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
     get_filename_component(ZPP_SOURCE_DIR "${ZPP_SOURCE_DIR}" ABSOLUTE)
+    file(REAL_PATH "${ZPP_SOURCE_DIR}" ZPP_SOURCE_DIR)
 
     if(NOT ZPP_BUILD_ZIG)
         set(ZPP_BUILD_ZIG "${ZPP_SOURCE_DIR}/build.zig")
@@ -388,6 +389,51 @@ function(zpp_add_zig_build target)
         SOURCES ${ALL_ZIG_FILES}
     )
 
+    # Preserve project-relative paths for non-Zig inputs. The package manifest is
+    # optional, while other resources must be listed explicitly by the caller.
+    set(RESOURCE_FILES ${ZPP_RESOURCES})
+    if(EXISTS "${ZPP_SOURCE_DIR}/build.zig.zon")
+        list(APPEND RESOURCE_FILES "${ZPP_SOURCE_DIR}/build.zig.zon")
+    endif()
+
+    set(ABS_RESOURCE_FILES "")
+    foreach(resource IN LISTS RESOURCE_FILES)
+        if(IS_ABSOLUTE "${resource}")
+            set(resource_path "${resource}")
+        else()
+            set(resource_path "${ZPP_SOURCE_DIR}/${resource}")
+        endif()
+        if(NOT EXISTS "${resource_path}" OR IS_DIRECTORY "${resource_path}")
+            message(FATAL_ERROR "zpp_add_zig_build(${target}): resource is not a file: ${resource_path}")
+        endif()
+        file(REAL_PATH "${resource_path}" abs_resource)
+        file(RELATIVE_PATH resource_rel "${ZPP_SOURCE_DIR}" "${abs_resource}")
+        if(IS_ABSOLUTE "${resource_rel}" OR resource_rel MATCHES "^\\.\\.(/|$)")
+            message(FATAL_ERROR "zpp_add_zig_build(${target}): resource must be inside SOURCE_DIR: ${resource_path}")
+        endif()
+        if(resource_rel MATCHES "\\.(zig|zpp)$")
+            message(FATAL_ERROR "zpp_add_zig_build(${target}): list Zig source in SOURCES, not RESOURCES: ${resource_path}")
+        endif()
+        list(APPEND ABS_RESOURCE_FILES "${abs_resource}")
+    endforeach()
+    list(REMOVE_DUPLICATES ABS_RESOURCE_FILES)
+
+    set(SHADOW_RESOURCE_FILES "")
+    foreach(abs_resource IN LISTS ABS_RESOURCE_FILES)
+        file(RELATIVE_PATH resource_rel "${ZPP_SOURCE_DIR}" "${abs_resource}")
+        set(shadow_resource "${SHADOW_DIR}/${resource_rel}")
+        get_filename_component(shadow_resource_dir "${shadow_resource}" DIRECTORY)
+        add_custom_command(
+            OUTPUT "${shadow_resource}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${shadow_resource_dir}"
+            COMMAND "${CMAKE_COMMAND}" -E copy "${abs_resource}" "${shadow_resource}"
+            DEPENDS "${abs_resource}"
+            COMMENT "Copying Zig project resource ${resource_rel}"
+            VERBATIM
+        )
+        list(APPEND SHADOW_RESOURCE_FILES "${shadow_resource}")
+    endforeach()
+
     set(STAMP_FILE "${AUTOGEN_BASE}/${target}_zig_build.stamp")
     add_custom_command(
         OUTPUT "${STAMP_FILE}"
@@ -398,7 +444,7 @@ function(zpp_add_zig_build target)
             ${ZPP_ZIG_BUILD_ARGS}
         COMMAND "${CMAKE_COMMAND}" -E touch "${STAMP_FILE}"
         WORKING_DIRECTORY "${SHADOW_DIR}"
-        DEPENDS ${SHADOW_ZIG_FILES}
+        DEPENDS ${SHADOW_ZIG_FILES} ${SHADOW_RESOURCE_FILES}
         COMMENT "Running zig build in shadow directory ${SHADOW_DIR}"
         VERBATIM
     )

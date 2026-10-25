@@ -119,10 +119,19 @@ zpp_add_zig_build(my_zig_project
     SOURCES
         src/main.zig
         src/lib.zig
+    RESOURCES
+        src/assets/message.txt
     INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/include"
     COMPILE_DEFINITIONS "ENABLE_FAST_PATH=1"
 )
 ```
+
+`build.zig.zon` is copied into the shadow project automatically when present.
+List other non-Zig files needed by `build.zig` or `@embedFile` in `RESOURCES`.
+Resource paths are relative to `SOURCE_DIR` (or absolute paths inside it), and
+their directory layout is preserved. Changes to these files rerun `zig build`.
+For example, `src/main.zig` can use `@embedFile("assets/message.txt")` with the
+resource path shown above.
 
 ---
 

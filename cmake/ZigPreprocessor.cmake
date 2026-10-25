@@ -189,13 +189,13 @@ function(zpp_target_sources target)
     endif()
 
     # Determine Zig optimization flag from CMake build type
-    set(ZIG_OPT_FLAG "-O" "debug")
+    set(ZIG_OPT_FLAG "-O" "Debug")
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        set(ZIG_OPT_FLAG "-O" "fast")
+        set(ZIG_OPT_FLAG "-O" "ReleaseFast")
     elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-        set(ZIG_OPT_FLAG "-O" "safe")
+        set(ZIG_OPT_FLAG "-O" "ReleaseSafe")
     elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
-        set(ZIG_OPT_FLAG "-O" "small")
+        set(ZIG_OPT_FLAG "-O" "ReleaseSmall")
     endif()
 
     set(ZIG_LIBC_FLAG "-lc")
